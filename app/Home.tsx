@@ -8,8 +8,8 @@ export default function Home() {
   const [loaded, setLoaded] = useState(false)
   const [video, setVideo] = useState<File | null>()
   const [processing, setProcessing] = useState(false)
+  const [gifURL, setGifURL] = useState<string | null>(null);
   const ffmpegRef = useRef(new FFmpeg())
-  const gifRef = useRef<HTMLImageElement | null>(null)
   const messageRef = useRef<HTMLParagraphElement | null>(null)
 
   const load = async () => {
@@ -29,66 +29,96 @@ export default function Home() {
   }
 
   const transcode = async () => {
-    const ffmpeg = ffmpegRef.current
+    const ffmpeg = ffmpegRef.current;
     setProcessing(true);
-    if (video){
-        try {
-            await ffmpeg.writeFile('input.mp4', await fetchFile(video))
-            await ffmpeg.exec(['-i', 'input.mp4', 'output.gif'])
-            const data = (await ffmpeg.readFile('output.gif')) as any
-            if (gifRef.current)
-              gifRef.current.src = URL.createObjectURL(new Blob([data.buffer], { type: 'image/gif' }))
-        } catch {
-            console.error("The following error occured while transcoding: ", Error)
-        } finally {
-            setProcessing(false)
+    if (video) {
+      try {
+        await ffmpeg.writeFile('input.mp4', await fetchFile(video));
+        await ffmpeg.exec(['-i', 'input.mp4', 'output.gif']);
+        const data = await ffmpeg.readFile('output.gif');
+  
+        const blob = new Blob([data], { type: 'image/gif' });
+        setGifURL(URL.createObjectURL(blob));
+      } catch (error) {
+        console.error('The following error occurred while transcoding: ', error);
+      } finally {
+        setProcessing(false);
+        if (gifURL) {
+          URL.revokeObjectURL(gifURL);
         }
+        // Clear the messageRef after processing is complete
+        if (messageRef.current) {
+          messageRef.current.innerHTML = '';
+        }
+      }
     }
-  }
+  };
 
+  //loadffmpegCores
   useEffect(() => {
         load();
   }, []);
+  useEffect(() => {
+    return () => {
+      if (gifURL) {
+        URL.revokeObjectURL(gifURL);
+      }
+    };
+  }, [gifURL]);
 
   return loaded ? (
     //heroSection
     <div className="w-screen h-screen flex justify-center items-center">
         <div className='flex-col w-fit h-fit'>
-            <h1 className='text-center text-3xl text-gray-300 font-semibold'>Video to GiF</h1>
+            <h1 className='text-center text-3xl font-semibold mb-2'>VIDEO / GIF</h1>
+            <p className='text-center text-md italic font-normal'>Convert Video into Gif</p>
             <br/>
             
-            <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-white" htmlFor="file_input">
-                Upload file
-            </label>
-            <input className="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 dark:text-gray-400 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400" 
+            <div  className="flex flex-row justify-between">
+                <label className="block mb-2 text-sm font-medium text-gray-500" htmlFor="file_input">
+                    Upload file
+                </label>
+            </div>
+            <input className="block text-sm w-64 text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 dark:text-gray-400 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400" 
                 aria-describedby="file_input_help" 
                 id="file_input" 
                 type="file"
                 accept='video/*'
                 onChange={(e) => setVideo(e.target.files?.[0] || null)}
             />
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-300" id="file_input_help">
-                SVG, PNG, JPG or GIF (MAX. 800x400px).
+            <p className="mt-1 text-sm text-gray-500" id="file_input_help">
+                MP4. (MAX. 800x400px).
             </p>
             <video
                 controls
-                width={"250"}
+                className="block text-wrap max-w-64"
                 src={video ? URL.createObjectURL(video) : URL.createObjectURL(new Blob())}
             ></video>
             <br />
             
-            <button
-                onClick={transcode}
-                disabled={processing}
-                type="button"
-                className="text-gray-900 bg-gradient-to-r from-red-200 via-red-300 to-yellow-200 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none focus:ring-red-100 dark:focus:ring-red-400 font-medium rounded-lg text-sm px-5 py-2.5 text-center me-2 mb-2"
-            >
-                {processing ? ('Processing...') : ('Process Video')}
-            </button>
-            <p className="text-center" ref={messageRef}></p>
+            <div className="text-center w-max-64" >
+            <p ref={messageRef}></p>
+            </div>
+            <div className="flex flex-row justify-between">
+              <button
+                  onClick={transcode}
+                  disabled={processing}
+                  type="button"
+                  className="text-gray-900 bg-gradient-to-r from-red-200 via-red-300 to-yellow-200 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none focus:ring-red-100 dark:focus:ring-red-400 font-medium rounded-lg text-sm px-5 py-2.5 text-center me-2 mb-2"
+              >
+                  {processing ? ('Processing...') : ('Process Video')}
+              </button>
+              
+            </div>
             <br />
 
-            <img src="" ref={gifRef} alt="" width="250"/>
+            {gifURL ? (<>
+              <p>SUCCESS</p>
+              <img src={gifURL} alt="" width="250" />
+            </>
+            ) : (
+              <></>
+            )}
         </div>
     </div>
   ) : (
